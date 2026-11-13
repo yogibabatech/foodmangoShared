@@ -31,7 +31,14 @@ Each app lists it in `package.json` with a version tag:
    git tag v1.1.0
    git push origin main --tags
    ```
-3. In each app that needs the change: set `#v1.1.0` in its `package.json`, run `npm install`,
-   test, commit and push. Apps you do not update keep working on their old version.
+3. In each app that needs the change, run
+   ```bash
+   npm install "@fd/shared@github:yogibabatech/foodmangoShared#v1.1.0"
+   ```
+   then test, commit and push. Apps you do not update keep working on their old version.
+
+Apps (customer, vendor, rider) must pass their API address once at startup with
+`setApiUrl(process.env.EXPO_PUBLIC_API_URL)` (see their `src/lib/apiUrl.ts`): Expo fills in
+`EXPO_PUBLIC_` values only in the app's own files, not in this package.
 
 No secrets ever go in this repo: it is public.
