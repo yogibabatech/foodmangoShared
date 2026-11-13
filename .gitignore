@@ -1,0 +1,14 @@
+node_modules/
+dist/
+web-build/
+.expo/
+coverage/
+*.tsbuildinfo
+*.log
+.DS_Store
+Thumbs.db
+
+# env files (only the examples are committed)
+.env
+.env.*
+!.env.example
