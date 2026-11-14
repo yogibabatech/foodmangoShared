@@ -70,6 +70,8 @@ export function firebaseErrorMessage(error: unknown): string {
     case 'auth/captcha-check-failed':
     case 'auth/invalid-app-credential':
       return 'We could not confirm you are not a robot. Please reload the page and try again.';
+    case 'auth/timeout':
+      return 'The robot check did not finish. Please tap Send code again.';
     case 'auth/unauthorized-domain':
       return 'This website is not allowed to send codes yet. Please use your password for now.';
     case 'auth/operation-not-allowed':
@@ -80,26 +82,72 @@ export function firebaseErrorMessage(error: unknown): string {
   }
 }
 
+/** How long to wait for Google's robot check (and the send) before giving up. */
+const SEND_TIMEOUT_MS = 120_000;
+
+/**
+ * The box Google's robot check lives in. It is pinned to the screen: the websites do not scroll
+ * the page itself, so a box at the end of the page put Google's picture puzzle off-screen, where
+ * it could not be finished and the login waited forever. The puzzle Google opens is also pinned
+ * to the middle of the screen, above everything.
+ */
+export function robotCheckBox(): HTMLElement {
+  let box = document.getElementById('fm-recaptcha');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'fm-recaptcha';
+    box.style.cssText = 'position:fixed;left:0;bottom:0;z-index:2147483000;';
+    document.body.appendChild(box);
+  }
+  if (!document.getElementById('fm-recaptcha-style')) {
+    const style = document.createElement('style');
+    style.id = 'fm-recaptcha-style';
+    style.textContent = `
+      body > div:has(iframe[src*="recaptcha"][src*="bframe"]) {
+        position: fixed !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%);
+        z-index: 2147483647 !important;
+        max-width: 100vw;
+      }`;
+    document.head.appendChild(style);
+  }
+  return box;
+}
+
 /** Sends the SMS code to an Indian mobile number in E.164 form (+91...). */
 export async function sendFirebaseCode(phoneE164: string): Promise<void> {
   const { a, firebaseAuth } = await auth();
-  if (!verifier) {
-    // An invisible check, in a box of its own at the end of the page.
-    let box = document.getElementById('fm-recaptcha');
-    if (!box) {
-      box = document.createElement('div');
-      box.id = 'fm-recaptcha';
-      document.body.appendChild(box);
-    }
-    verifier = new firebaseAuth.RecaptchaVerifier(a, box, { size: 'invisible' });
-  }
-  try {
-    confirmation = await firebaseAuth.signInWithPhoneNumber(a, phoneE164, verifier);
-  } catch (error) {
-    // A failed check cannot be reused: start a fresh one next time.
-    verifier.clear();
+  const reset = () => {
+    verifier?.clear();
     verifier = null;
+  };
+  if (!verifier) {
+    verifier = new firebaseAuth.RecaptchaVerifier(a, robotCheckBox(), {
+      size: 'invisible',
+      badge: 'bottomleft',
+      // An answered check expires after a while: start a fresh one next time.
+      'expired-callback': reset,
+    });
+  }
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    confirmation = await Promise.race([
+      firebaseAuth.signInWithPhoneNumber(a, phoneE164, verifier),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(Object.assign(new Error('Robot check timed out'), { code: 'auth/timeout' })),
+          SEND_TIMEOUT_MS,
+        );
+      }),
+    ]);
+  } catch (error) {
+    // A failed or abandoned check cannot be reused: start a fresh one next time.
+    reset();
     throw error;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
