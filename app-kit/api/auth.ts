@@ -46,3 +46,18 @@ export const registerWithPassword = (input: { phone: string; name: string; passw
     auth: false,
     body: input,
   });
+
+/** Whether the API has OTP login (Firebase) switched on. */
+export const getFirebaseStatus = () =>
+  http.request<{ enabled: boolean }>('/auth/firebase', { auth: false });
+
+/** Which app is logging in: only the Customer app may create a new account with OTP. */
+export type LoginApp = 'customer' | 'vendor' | 'rider' | 'admin';
+
+/** Log in with the token Firebase gave after the SMS code was checked. */
+export const loginWithFirebase = (idToken: string, app: LoginApp) =>
+  http.request<VerifyOtpResult & { isNewUser: boolean }>('/auth/firebase', {
+    method: 'POST',
+    auth: false,
+    body: { idToken, app },
+  });
