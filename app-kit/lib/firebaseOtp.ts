@@ -102,7 +102,10 @@ export function robotCheckBox(): HTMLElement {
   if (!document.getElementById('fm-recaptcha-style')) {
     const style = document.createElement('style');
     style.id = 'fm-recaptcha-style';
+    // The corner badge is hidden; Google allows that when the page shows its reCAPTCHA notice
+    // instead (the login screen does, under Send code). The check itself still runs.
     style.textContent = `
+      .grecaptcha-badge { visibility: hidden !important; }
       body > div:has(iframe[src*="recaptcha"][src*="bframe"]) {
         position: fixed !important;
         top: 50% !important;

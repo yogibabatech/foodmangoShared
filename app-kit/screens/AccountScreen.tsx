@@ -1,6 +1,6 @@
 import type { UserRole } from '../../src';
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import {
   getFirebaseStatus,
   getOtpMethods,
@@ -333,7 +333,28 @@ export function AccountScreen(props: AccountScreenProps) {
 
         {otp ? (
           step === 'phone' ? (
-            <Button title="Send code" onPress={() => void sendCode()} loading={busy} />
+            <>
+              <Button title="Send code" onPress={() => void sendCode()} loading={busy} />
+              <AppText variant="caption" style={styles.center}>
+                This site is protected by reCAPTCHA and the Google{' '}
+                <AppText
+                  variant="caption"
+                  style={styles.link}
+                  onPress={() => void Linking.openURL('https://policies.google.com/privacy')}
+                >
+                  Privacy Policy
+                </AppText>{' '}
+                and{' '}
+                <AppText
+                  variant="caption"
+                  style={styles.link}
+                  onPress={() => void Linking.openURL('https://policies.google.com/terms')}
+                >
+                  Terms of Service
+                </AppText>{' '}
+                apply.
+              </AppText>
+            </>
           ) : (
             <>
               <Button
@@ -412,4 +433,5 @@ const styles = StyleSheet.create({
   show: { alignSelf: 'flex-end', paddingTop: spacing.xs },
   showText: { color: colors.primary },
   center: { textAlign: 'center' },
+  link: { color: colors.primary, textDecorationLine: 'underline' },
 });
