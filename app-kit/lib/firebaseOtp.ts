@@ -1,5 +1,6 @@
 import { Platform } from 'react-native';
 import type { ConfirmationResult, RecaptchaVerifier } from 'firebase/auth';
+import { puzzleScale } from './puzzleScale';
 
 /**
  * OTP login by SMS through Firebase Phone Auth, for the WEBSITES (for now).
@@ -46,6 +47,9 @@ async function auth() {
   const a = firebaseAuth.getAuth(app);
   a.useDeviceLanguage();
   if (config.testMode) a.settings.appVerificationDisabledForTesting = true;
+  // Loads the project's reCAPTCHA settings. It matters only once score-based reCAPTCHA is switched
+  // on in the Firebase console (Authentication > Settings > Fraud prevention); until then it does nothing.
+  await firebaseAuth.initializeRecaptchaConfig(a).catch(() => undefined);
   return { a, firebaseAuth };
 }
 
@@ -110,11 +114,20 @@ export function robotCheckBox(): HTMLElement {
         position: fixed !important;
         top: 50% !important;
         left: 50% !important;
-        transform: translate(-50%, -50%);
+        transform: translate(-50%, -50%) scale(var(--fm-puzzle-scale, 1));
+        transform-origin: center center;
         z-index: 2147483647 !important;
         max-width: 100vw;
       }`;
     document.head.appendChild(style);
+    // Shrink the puzzle on small screens so its Verify button is not cut off (the page cannot scroll).
+    const fitPuzzle = () =>
+      document.documentElement.style.setProperty(
+        '--fm-puzzle-scale',
+        String(puzzleScale(window.innerWidth, window.innerHeight)),
+      );
+    fitPuzzle();
+    window.addEventListener('resize', fitPuzzle);
   }
   return box;
 }
