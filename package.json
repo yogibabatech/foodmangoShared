@@ -1,6 +1,6 @@
 {
   "name": "@fd/shared",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "private": true,
   "description": "Code shared by the Food Delivery API and apps. src/ = plain rules (API and apps). app-kit/ = phone app pieces (customer, vendor, rider). Used as TypeScript source.",
   "type": "module",

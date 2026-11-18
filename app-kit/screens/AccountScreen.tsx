@@ -74,6 +74,7 @@ export function AccountScreen(props: AccountScreenProps) {
   // password login (no robot check) and are told how to open the site in their real browser.
   const inApp = currentInAppBrowser();
   const [linkCopied, setLinkCopied] = useState(false);
+  const [inAppHidden, setInAppHidden] = useState(false);
   const openInChrome = () => {
     const link = chromeIntentUrl(window.location.href);
     if (link) window.location.href = link;
@@ -228,9 +229,10 @@ export function AccountScreen(props: AccountScreenProps) {
         <AppText variant="muted">{subtitle}</AppText>
       </View>
 
-      {inApp ? (
+      {inApp && !inAppHidden ? (
         <View style={styles.inApp}>
           <NoticeBanner
+            onDismiss={() => setInAppHidden(true)}
             message={`You are in ${inApp === 'In-app browser' ? "another app's browser" : `${inApp}'s browser`}, where the SMS code check often does not work. Log in with your password here, or open this page in Chrome or Safari to use the SMS code.`}
           />
           <View style={styles.inAppButtons}>
