@@ -70,11 +70,14 @@ function currentInAppBrowser() {
 
 export function AccountScreen(props: AccountScreenProps) {
   const { allowedRoles, allowSignup, audience, ordering = false, onNotNow, onUseCode } = props;
-  // Google's robot check often fails inside Instagram's own browser, so people there start on the
-  // password login (no robot check) and are told how to open the site in their real browser.
+  // Google's robot check often fails inside Instagram's own browser. People there still start on the
+  // OTP login; only if sending the code fails are they told to open the site in their real browser
+  // (or use their password).
   const inApp = currentInAppBrowser();
   const [linkCopied, setLinkCopied] = useState(false);
   const [inAppHidden, setInAppHidden] = useState(false);
+  // True once sending the SMS code has failed inside an app's own browser.
+  const [otpFailedInApp, setOtpFailedInApp] = useState(false);
   const openInChrome = () => {
     const link = chromeIntentUrl(window.location.href);
     if (link) window.location.href = link;
@@ -107,7 +110,7 @@ export function AccountScreen(props: AccountScreenProps) {
     getFirebaseStatus()
       .then((s) => {
         setOtpReady(s.enabled);
-        if (s.enabled && !currentInAppBrowser()) setMethod('otp');
+        if (s.enabled) setMethod('otp');
       })
       .catch(() => setOtpReady(false));
   }, []);
@@ -168,8 +171,13 @@ export function AccountScreen(props: AccountScreenProps) {
       setCode('');
       setStep('code');
       resend.restart(RESEND_SECONDS);
+      setOtpFailedInApp(false);
     } catch (e) {
       setError(firebaseErrorMessage(e));
+      if (inApp) {
+        setOtpFailedInApp(true);
+        setInAppHidden(false);
+      }
     } finally {
       setBusy(false);
     }
@@ -229,11 +237,11 @@ export function AccountScreen(props: AccountScreenProps) {
         <AppText variant="muted">{subtitle}</AppText>
       </View>
 
-      {inApp && !inAppHidden ? (
+      {inApp && otpFailedInApp && !inAppHidden ? (
         <View style={styles.inApp}>
           <NoticeBanner
             onDismiss={() => setInAppHidden(true)}
-            message={`You are in ${inApp === 'In-app browser' ? "another app's browser" : `${inApp}'s browser`}, where the SMS code check often does not work. Log in with your password here, or open this page in Chrome or Safari to use the SMS code.`}
+            message={`You are in ${inApp === 'In-app browser' ? "another app's browser" : `${inApp}'s browser`}, where the SMS code check often does not work. Open this page in Chrome or Safari and try again, or log in with your password.`}
           />
           <View style={styles.inAppButtons}>
             {/android/i.test(navigator.userAgent) ? (
