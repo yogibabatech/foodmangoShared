@@ -73,7 +73,7 @@ export function firebaseErrorMessage(error: unknown): string {
       return 'Cannot reach the internet. Check your connection and try again.';
     case 'auth/captcha-check-failed':
     case 'auth/invalid-app-credential':
-      return 'We could not confirm you are not a robot. Please reload the page and try again.';
+      return 'We could not confirm you are not a robot. Please reload the page and try again. If you opened this from Instagram or another app, open the page in Chrome or Safari, or log in with your password.';
     case 'auth/timeout':
       return 'The robot check did not finish. Please tap Send code again.';
     case 'auth/unauthorized-domain':

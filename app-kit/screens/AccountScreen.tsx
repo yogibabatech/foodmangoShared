@@ -1,6 +1,6 @@
 import type { UserRole } from '../../src';
 import { useEffect, useState } from 'react';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 import {
   getFirebaseStatus,
   getOtpMethods,
@@ -12,13 +12,14 @@ import {
 } from '../api/auth';
 import { errorMessage } from '../api/client';
 import type { VerifyOtpResult } from '../api/types';
-import { AppText, Button, ErrorMessage, OtpInput, Screen, TextInput } from '../components';
+import { AppText, Button, ErrorMessage, NoticeBanner, OtpInput, Screen, TextInput } from '../components';
 import {
   confirmFirebaseCode,
   firebaseErrorMessage,
   firebaseOtpAvailable,
   sendFirebaseCode,
 } from '../lib/firebaseOtp';
+import { chromeIntentUrl, detectInAppBrowser } from '../lib/inAppBrowser';
 import { validateAccountForm, type FormErrors } from '../lib/passwordForm';
 import { cleanPhoneInput, toE164 } from '../lib/phone';
 import { useCountdown } from '../lib/useCountdown';
@@ -60,8 +61,29 @@ function loginAppFor(roles: UserRole[]): LoginApp {
  * - Password: mobile number and password.
  * The same screen is used by every app; each app says who it is for.
  */
+/** The name of the app's own browser (Instagram, ...) if this website is open inside one. */
+function currentInAppBrowser() {
+  return Platform.OS === 'web' && typeof navigator !== 'undefined'
+    ? detectInAppBrowser(navigator.userAgent)
+    : null;
+}
+
 export function AccountScreen(props: AccountScreenProps) {
   const { allowedRoles, allowSignup, audience, ordering = false, onNotNow, onUseCode } = props;
+  // Google's robot check often fails inside Instagram's own browser, so people there start on the
+  // password login (no robot check) and are told how to open the site in their real browser.
+  const inApp = currentInAppBrowser();
+  const [linkCopied, setLinkCopied] = useState(false);
+  const openInChrome = () => {
+    const link = chromeIntentUrl(window.location.href);
+    if (link) window.location.href = link;
+  };
+  const copyLink = () => {
+    void navigator.clipboard
+      ?.writeText(window.location.href)
+      .then(() => setLinkCopied(true))
+      .catch(() => undefined);
+  };
 
   const [method, setMethod] = useState<Method>('password');
   const [otpReady, setOtpReady] = useState(false);
@@ -84,7 +106,7 @@ export function AccountScreen(props: AccountScreenProps) {
     getFirebaseStatus()
       .then((s) => {
         setOtpReady(s.enabled);
-        if (s.enabled) setMethod('otp');
+        if (s.enabled && !currentInAppBrowser()) setMethod('otp');
       })
       .catch(() => setOtpReady(false));
   }, []);
@@ -205,6 +227,20 @@ export function AccountScreen(props: AccountScreenProps) {
         </AppText>
         <AppText variant="muted">{subtitle}</AppText>
       </View>
+
+      {inApp ? (
+        <View style={styles.inApp}>
+          <NoticeBanner
+            message={`You are in ${inApp === 'In-app browser' ? "another app's browser" : `${inApp}'s browser`}, where the SMS code check often does not work. Log in with your password here, or open this page in Chrome or Safari to use the SMS code.`}
+          />
+          <View style={styles.inAppButtons}>
+            {/android/i.test(navigator.userAgent) ? (
+              <Button title="Open in Chrome" variant="secondary" onPress={openInChrome} />
+            ) : null}
+            <Button title={linkCopied ? 'Link copied ✓' : 'Copy link'} variant="secondary" onPress={copyLink} />
+          </View>
+        </View>
+      ) : null}
 
       {otpReady ? (
         <View style={styles.tabs} accessibilityRole="tablist">
@@ -410,6 +446,8 @@ export function AccountScreen(props: AccountScreenProps) {
 }
 
 const styles = StyleSheet.create({
+  inApp: { gap: spacing.sm, marginBottom: spacing.md },
+  inAppButtons: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   header: { gap: spacing.sm, marginTop: spacing.xl, marginBottom: spacing.lg },
   tabs: {
     flexDirection: 'row',
