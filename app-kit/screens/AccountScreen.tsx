@@ -45,6 +45,12 @@ export interface AccountScreenProps {
   onNotNow?: () => void;
   /** Customer only: switch to the code login (shown only when a code method is on). */
   onUseCode?: () => void;
+  /**
+   * Phone apps (Rider, Kitchen): OTP login done on the website in Chrome and handed back to the app,
+   * because the robot check Firebase needs cannot run inside the app. Returns null when the person
+   * closed the page without logging in.
+   */
+  otpInBrowser?: () => Promise<VerifyOtpResult | null>;
 }
 
 /** Which app this is, for the OTP login (only the Customer app may create accounts). */
@@ -69,7 +75,7 @@ function currentInAppBrowser() {
 }
 
 export function AccountScreen(props: AccountScreenProps) {
-  const { allowedRoles, allowSignup, audience, ordering = false, onNotNow, onUseCode } = props;
+  const { allowedRoles, allowSignup, audience, ordering = false, onNotNow, onUseCode, otpInBrowser } = props;
   // Google's robot check often fails inside Instagram's own browser. People there still start on the
   // OTP login; only if sending the code fails are they told to open the site in their real browser
   // (or use their password).
@@ -134,6 +140,20 @@ export function AccountScreen(props: AccountScreenProps) {
     // This logs in; the app then moves on by itself (see the root layout). A new customer is
     // asked for their name there.
     await useAuth.getState().signIn(result);
+  }
+
+  async function browserOtp() {
+    if (!otpInBrowser || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await otpInBrowser();
+      if (result) await finish(result);
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function submitPassword() {
@@ -249,6 +269,18 @@ export function AccountScreen(props: AccountScreenProps) {
             ) : null}
             <Button title={linkCopied ? 'Link copied ✓' : 'Copy link'} variant="secondary" onPress={copyLink} />
           </View>
+        </View>
+      ) : null}
+
+      {otpInBrowser && !otpReady ? (
+        <View style={styles.browserOtp}>
+          <Button title="Log in with OTP (SMS)" onPress={() => void browserOtp()} loading={busy} />
+          <AppText variant="caption" style={styles.center}>
+            Opens a FoodMango page in Chrome, then comes back here.
+          </AppText>
+          <AppText variant="muted" style={styles.center}>
+            or log in with your password
+          </AppText>
         </View>
       ) : null}
 
@@ -457,6 +489,7 @@ export function AccountScreen(props: AccountScreenProps) {
 
 const styles = StyleSheet.create({
   inApp: { gap: spacing.sm, marginBottom: spacing.md },
+  browserOtp: { gap: spacing.sm, marginBottom: spacing.lg },
   inAppButtons: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   header: { gap: spacing.sm, marginTop: spacing.xl, marginBottom: spacing.lg },
   tabs: {
