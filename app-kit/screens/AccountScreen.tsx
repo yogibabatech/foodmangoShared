@@ -1,5 +1,5 @@
 import type { UserRole } from '../../src';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Linking, Platform, Pressable, StyleSheet, View } from 'react-native';
 import {
   getFirebaseStatus,
@@ -17,6 +17,7 @@ import {
   confirmFirebaseCode,
   firebaseErrorMessage,
   firebaseOtpAvailable,
+  ROBOT_CHECK_SLOT,
   sendFirebaseCode,
 } from '../lib/firebaseOtp';
 import { chromeIntentUrl, detectInAppBrowser } from '../lib/inAppBrowser';
@@ -107,6 +108,10 @@ export function AccountScreen(props: AccountScreenProps) {
   const [busy, setBusy] = useState(false);
   const [codeLogin, setCodeLogin] = useState(false);
   const [step, setStep] = useState<OtpStep>('phone');
+  // True while the code is being sent: the code screen then shows Google's robot check in its middle.
+  const [sending, setSending] = useState(false);
+  // Bumped by Change number, so a send that was left behind (its robot check never answered) is ignored.
+  const sendRun = useRef(0);
   const [code, setCode] = useState('');
   const resend = useCountdown(0);
 
@@ -186,20 +191,30 @@ export function AccountScreen(props: AccountScreenProps) {
     setErrors({});
     if (busy) return;
     setBusy(true);
+    // Go to the code screen first: Google's robot check is shown there, in the middle of a short
+    // page, so its picture puzzle (when it asks for one) is in view and not hidden at the bottom.
+    setCode('');
+    setStep('code');
+    setSending(true);
+    const run = ++sendRun.current;
     try {
+      await new Promise((resolve) => setTimeout(resolve, 50)); // let the screen draw the check's spot
       await sendFirebaseCode(phone);
-      setCode('');
-      setStep('code');
+      if (run !== sendRun.current) return;
+      setSending(false);
       resend.restart(RESEND_SECONDS);
       setOtpFailedInApp(false);
     } catch (e) {
+      if (run !== sendRun.current) return;
+      setSending(false);
+      setStep('phone');
       setError(firebaseErrorMessage(e));
       if (inApp) {
         setOtpFailedInApp(true);
         setInAppHidden(false);
       }
     } finally {
-      setBusy(false);
+      if (run === sendRun.current) setBusy(false);
     }
   }
 
@@ -238,7 +253,9 @@ export function AccountScreen(props: AccountScreenProps) {
     ? 'To place your order, log in or create an account. Your cart is saved.'
     : otp
       ? step === 'code'
-        ? `Enter the 6 digit code we sent to +91 ${digits}.`
+        ? sending
+          ? `Sending a code to +91 ${digits}. Tick “I'm not a robot” below to get it.`
+          : `Enter the 6 digit code we sent to +91 ${digits}.`
         : allowSignup
           ? 'Enter your mobile number. We will send you a code by SMS. New here? Your account is made when you verify.'
           : 'Enter the mobile number the shop gave you. We will send you a code by SMS.'
@@ -360,7 +377,12 @@ export function AccountScreen(props: AccountScreenProps) {
           />
         ) : null}
 
-        {otp && step === 'code' ? (
+        {otp && step === 'code' && sending ? (
+          // Google's robot check is placed here (see firebaseOtp.ts).
+          <View nativeID={ROBOT_CHECK_SLOT} style={styles.robotCheck} />
+        ) : null}
+
+        {otp && step === 'code' && !sending ? (
           <View style={styles.codeBox}>
             <OtpInput
               value={code}
@@ -435,17 +457,22 @@ export function AccountScreen(props: AccountScreenProps) {
             </>
           ) : (
             <>
-              <Button
-                title="Verify and continue"
-                onPress={() => void verifyCode()}
-                loading={busy}
-                disabled={code.length !== 6}
-              />
+              {sending ? null : (
+                <Button
+                  title="Verify and continue"
+                  onPress={() => void verifyCode()}
+                  loading={busy}
+                  disabled={code.length !== 6}
+                />
+              )}
               <View style={styles.row}>
                 <Button
                   title="Change number"
                   variant="ghost"
                   onPress={() => {
+                    sendRun.current += 1;
+                    setSending(false);
+                    setBusy(false);
                     setStep('phone');
                     setCode('');
                     setError(null);
@@ -490,6 +517,8 @@ export function AccountScreen(props: AccountScreenProps) {
 const styles = StyleSheet.create({
   inApp: { gap: spacing.sm, marginBottom: spacing.md },
   browserOtp: { gap: spacing.sm, marginBottom: spacing.lg },
+  // Room for Google's "I'm not a robot" box (304 x 78), centred.
+  robotCheck: { minHeight: 90, alignItems: 'center', justifyContent: 'center', marginVertical: spacing.md },
   inAppButtons: { flexDirection: 'row', gap: spacing.sm, flexWrap: 'wrap' },
   header: { gap: spacing.sm, marginTop: spacing.xl, marginBottom: spacing.lg },
   tabs: {

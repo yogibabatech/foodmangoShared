@@ -26,6 +26,8 @@ export function setFirebaseConfig(_next: FirebaseWebConfig | null): void {
 
 export const firebaseOtpAvailable = () => false;
 
+export const ROBOT_CHECK_SLOT = 'fm-robot-check-slot';
+
 const notHere = () => Object.assign(new Error('OTP by Firebase works on the website only'), { code: 'auth/operation-not-allowed' });
 
 export function robotCheckBox(): HTMLElement {

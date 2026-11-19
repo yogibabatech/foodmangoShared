@@ -101,6 +101,24 @@ export function robotCheckBox(): HTMLElement {
   return box;
 }
 
+/**
+ * The id of a spot on the code screen where the robot check should live. When the screen shows it
+ * (a View with nativeID ROBOT_CHECK_SLOT), Google's check is placed there, in the middle of a short
+ * page, so its picture puzzle opens in view instead of at the bottom of the screen.
+ */
+export const ROBOT_CHECK_SLOT = 'fm-robot-check-slot';
+
+/** A fresh box for the robot check, inside the code screen's spot when there is one. */
+function robotCheckTarget(): HTMLElement {
+  const slot = document.getElementById(ROBOT_CHECK_SLOT);
+  if (!slot) return robotCheckBox();
+  robotCheckBox(); // still adds the styles that keep the puzzle on screen
+  slot.replaceChildren();
+  const box = document.createElement('div');
+  slot.appendChild(box);
+  return box;
+}
+
 /** Sends the SMS code to an Indian mobile number in E.164 form (+91...). */
 export async function sendFirebaseCode(phoneE164: string): Promise<void> {
   const { a, firebaseAuth } = await auth();
@@ -108,9 +126,16 @@ export async function sendFirebaseCode(phoneE164: string): Promise<void> {
     verifier?.clear();
     verifier = null;
   };
+  // With a spot on the screen, each send gets a fresh check placed there (a check cannot be moved
+  // once made, and the screen may have been rebuilt since the last one).
+  const inSlot = document.getElementById(ROBOT_CHECK_SLOT) !== null;
+  if (verifier && inSlot) reset();
   if (!verifier) {
-    verifier = new firebaseAuth.RecaptchaVerifier(a, robotCheckBox(), {
-      size: 'invisible',
+    verifier = new firebaseAuth.RecaptchaVerifier(a, robotCheckTarget(), {
+      // In the code screen's spot, Google's visible "I'm not a robot" box: its picture puzzle, when
+      // one is needed, opens right next to it in the middle of the screen. An invisible check
+      // would open its puzzle by its corner badge at the bottom, often off-screen on phones.
+      size: inSlot ? 'normal' : 'invisible',
       badge: 'bottomleft',
       // An answered check expires after a while: start a fresh one next time.
       'expired-callback': reset,
