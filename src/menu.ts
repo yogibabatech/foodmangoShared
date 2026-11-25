@@ -51,6 +51,10 @@ export interface PublicVendor {
   /** Shown as an Open or Closed badge. A closed kitchen still shows its menu. */
   isOpen: boolean;
   prepTimeMinutes: number;
+  /** Preorder-only kitchen: no order-now, customers book a delivery time on `preorderWeekdays`. */
+  preorderOnly?: boolean;
+  /** Weekdays a preorder-only kitchen delivers on (0 = Sunday). Empty means any day. */
+  preorderWeekdays?: number[];
   /** PIN codes this kitchen delivers to. Empty means it is not limited to an area. */
   servicePincodes: string[];
   categories: PublicCategory[];
